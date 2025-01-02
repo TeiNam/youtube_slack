@@ -2,16 +2,13 @@
 import time
 import logging
 import asyncio
-from datetime import datetime
-from typing import List, Optional
-from fastapi import FastAPI, BackgroundTasks
+from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from apis.routers import api_router
 from utils.config import Config
 from utils.db_manager import DatabaseManager
-from utils.youtube_api import YouTubeAPI
 from utils.slack_sender import SlackSender
-from utils.time_utils import get_current_utc
+
 
 # 로깅 설정
 logging.basicConfig(
