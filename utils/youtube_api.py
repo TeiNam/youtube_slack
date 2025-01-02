@@ -99,56 +99,72 @@ class YouTubeAPI:
             logger.error(f"Error getting channel info for {handling_id}: {e}")
             raise ValueError(f"Failed to get channel info: {str(e)}")
 
+    # utils/youtube_api.py
+
     @log_api_call
-    def check_new_videos(self, channel_id: str, last_check: datetime) -> List[Dict[str, str]]:
-        """채널의 새로운 동영상을 확인합니다.
+    def check_new_videos_batch(self, channels: List[dict], last_check_time: datetime) -> Dict[str, List[Dict]]:
+        """여러 채널의 새 동영상을 확인합니다.
 
         Args:
-            channel_id: 유튜브 채널 ID
-            last_check: 마지막 확인 시간
+            channels: [{'yt_channel_id': str, 'yt_ch_name': str}, ...]
+            last_check_time: 마지막 확인 시간
 
         Returns:
-            list: 새로운 동영상 정보 목록
-            [{'video_id': str, 'title': str, 'published_at': datetime}, ...]
+            Dict[str, List[Dict]]: 채널 ID별 새 동영상 목록
         """
         try:
-            # 채널의 업로드 플레이리스트 ID 조회 (quota: 1)
-            self._daily_quota_used += 1
+            # 1. 모든 채널 ID로 한 번에 플레이리스트 ID 조회 (quota: 1)
+            channel_ids = [ch['yt_channel_id'] for ch in channels]
             channel_response = self.youtube.channels().list(
-                id=channel_id,
-                part='contentDetails'
+                id=','.join(channel_ids),
+                part='contentDetails',
+                maxResults=50
             ).execute()
 
-            if not channel_response.get('items'):
-                raise ValueError(f"Channel not found: {channel_id}")
+            # 채널별 플레이리스트 ID 매핑
+            playlist_mapping = {}
+            for item in channel_response.get('items', []):
+                channel_id = item['id']
+                playlist_id = item['contentDetails']['relatedPlaylists']['uploads']
+                playlist_mapping[channel_id] = playlist_id
 
-            playlist_id = channel_response['items'][0]['contentDetails']['relatedPlaylists']['uploads']
+            # 2. 각 플레이리스트의 최근 동영상 개별 조회
+            new_videos_by_channel = {}
 
-            # 최근 동영상 조회 (quota: 1)
-            self._daily_quota_used += 1
-            playlist_response = self.youtube.playlistItems().list(
-                playlistId=playlist_id,
-                part='snippet',
-                maxResults=5  # 최근 5개만 확인
-            ).execute()
+            for channel_id, playlist_id in playlist_mapping.items():
+                try:
+                    # 플레이리스트 항목 조회 (quota: 1 per request)
+                    playlist_response = self.youtube.playlistItems().list(
+                        playlistId=playlist_id,
+                        part='snippet',
+                        maxResults=5
+                    ).execute()
 
-            new_videos = []
-            for item in playlist_response.get('items', []):
-                published_at = datetime.fromisoformat(
-                    item['snippet']['publishedAt'].replace('Z', '+00:00')
-                )
+                    # 새 동영상 필터링
+                    new_videos = []
+                    for item in playlist_response.get('items', []):
+                        published_at = datetime.fromisoformat(
+                            item['snippet']['publishedAt'].replace('Z', '+00:00')
+                        )
 
-                if published_at > last_check:
-                    new_videos.append({
-                        'video_id': item['snippet']['resourceId']['videoId'],
-                        'title': item['snippet']['title'],
-                        'published_at': published_at
-                    })
+                        if published_at > last_check_time:
+                            new_videos.append({
+                                'video_id': item['snippet']['resourceId']['videoId'],
+                                'title': item['snippet']['title'],
+                                'published_at': published_at
+                            })
 
-            return new_videos
+                    if new_videos:
+                        new_videos_by_channel[channel_id] = new_videos
+
+                except Exception as e:
+                    logger.error(f"Error checking videos for channel {channel_id}: {e}")
+                    continue
+
+            return new_videos_by_channel
 
         except Exception as e:
-            logger.error(f"Error checking new videos for channel {channel_id}: {e}")
+            logger.error(f"Error checking new videos in batch: {e}")
             raise ValueError(f"Failed to check new videos: {str(e)}")
 
     def get_daily_quota_used(self) -> int:

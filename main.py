@@ -2,12 +2,15 @@
 import time
 import logging
 import asyncio
+
+from datetime import timedelta
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from apis.routers import api_router
 from utils.config import Config
 from utils.db_manager import DatabaseManager
 from utils.slack_sender import SlackSender
+from utils.time_utils import get_current_utc, format_utc
 
 
 # 로깅 설정
@@ -36,32 +39,52 @@ async def check_new_videos():
 
         # 모든 채널 조회
         channels = db.get_all_channels()
+        if not channels:
+            logger.info("No channels to check")
+            return
+
         logger.info(f"Checking {len(channels)} channels for new videos")
 
+        # 채널 정보 준비
+        channel_infos = [
+            {
+                'yt_channel_id': ch.yt_channel_id,
+                'yt_ch_name': ch.yt_ch_name
+            }
+            for ch in channels
+        ]
+
+        # 최신 동영상 배치 조회
+        try:
+            last_check = get_current_utc() - timedelta(hours=1)  # 1시간 전부터 체크
+            new_videos_by_channel = youtube_api.check_new_videos_batch(
+                channel_infos,
+                last_check
+            )
+        except Exception as e:
+            logger.error(f"Error checking new videos: {e}")
+            return
+
+        # 알림 전송
         notification_count = 0
         for channel in channels:
-            try:
-                # 마지막 확인 시간 조회
-                last_check = db.get_last_check_time(channel.yt_channel_id)
+            new_videos = new_videos_by_channel.get(channel.yt_channel_id, [])
 
-                # 새 동영상 확인
-                new_videos = youtube_api.check_new_videos(channel.yt_channel_id, last_check)
+            for video in new_videos:
+                success = slack_sender.send_notification(
+                    channel.yt_channel_id,
+                    {
+                        'title': video['title'],
+                        'url': f"https://www.youtube.com/watch?v={video['video_id']}",
+                        'published_at': format_utc(video['published_at'])
+                    }
+                )
+                if success:
+                    notification_count += 1
 
-                # 새 동영상이 있으면 알림 전송
-                for video in new_videos:
-                    success = slack_sender.send_notification(
-                        channel.yt_channel_id,
-                        video
-                    )
-                    if success:
-                        notification_count += 1
-
-                # 마지막 확인 시간 업데이트
+            # 마지막 확인 시간 업데이트
+            if new_videos:
                 db.update_last_check_time(channel.yt_channel_id)
-
-            except Exception as e:
-                logger.error(f"Error processing channel {channel.yt_channel_id}: {e}")
-                continue
 
         elapsed_time = time.time() - start_time
         logger.info(
@@ -74,7 +97,6 @@ async def check_new_videos():
         logger.error(f"Error in check_new_videos: {e}", exc_info=True)
 
     finally:
-        # 다음 실행을 위해 대기
         if is_running:
             await asyncio.sleep(Config.CHECK_INTERVAL)
             asyncio.create_task(check_new_videos())

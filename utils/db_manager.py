@@ -240,3 +240,16 @@ class DatabaseManager:
             if row and row['last_check_at']:
                 return to_utc(row['last_check_at'])
             return get_current_utc()  # 기본값으로 현재 UTC 시간 반환
+
+    def get_channel_by_yt_channel_id(self, yt_channel_id: str) -> Optional[Channel]:
+        """YouTube 채널 ID로 채널을 조회합니다."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM channel 
+                WHERE yt_channel_id = ?
+            """, (yt_channel_id,))
+            row = cursor.fetchone()
+            if row:
+                return Channel(**dict(row))
+            return None
