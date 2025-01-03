@@ -73,3 +73,16 @@ htmlcov/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Node
+front/node_modules/
+front/.npm
+front/.env
+front/.env.local
+front/coverage/
+
+# Build
+front/dist/
+front/build/
+
+

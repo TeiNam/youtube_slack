@@ -72,20 +72,141 @@ youtube_slack/
 ├── apis/                   # API 엔드포인트 구현
 │   ├── channel.py         # 채널 관리 API
 │   ├── models.py          # Pydantic 모델
-│   ├── routers.py         # API 라우터
+│   ├── routers.py         # API 라우터  
 │   └── webhook.py         # 웹훅 관리 API
 ├── docker/                # Docker 관련 파일
 │   ├── Dockerfile
 │   └── docker-compose.yml
+├── front/                 # 프론트엔드 애플리케이션
+│   ├── src/
+│   │   ├── api/          # API 클라이언트
+│   │   ├── components/   # React 컴포넌트
+│   │   ├── types/        # TypeScript 타입 정의
+│   │   ├── App.tsx       # 루트 컴포넌트
+│   │   └── main.tsx      # 앱 진입점
+│   ├── index.html        # HTML 템플릿
+│   └── package.json      # 프론트엔드 의존성
 ├── utils/                 # 유틸리티 모듈
 │   ├── config.py         # 설정 관리
 │   ├── db_manager.py     # 데이터베이스 관리
 │   ├── slack_sender.py   # Slack 알림 전송
 │   ├── time_utils.py     # 시간 관련 유틸리티
 │   └── youtube_api.py    # YouTube API 클라이언트
-├── main.py               # 애플리케이션 메인
-└── requirements.txt      # 의존성 패키지 목록
+├── main.py               # 백엔드 애플리케이션 메인
+└── requirements.txt      # 백엔드 의존성 패키지 목록
 ```
+
+## 프론트엔드
+
+### 기술 스택
+- React + TypeScript
+- Vite (빌드 도구)
+- Tailwind CSS (스타일링)
+- Axios (API 클라이언트)
+
+### 주요 컴포넌트
+- **Dashboard**: 메인 대시보드 화면
+- **ChannelForm**: YouTube 채널 등록 및 관리
+- **WebhookForm**: Slack 웹훅 등록 및 관리
+- **StatusCard**: 서비스 상태 표시
+
+### 설치 및 실행
+
+1. 프론트엔드 의존성 설치:
+```bash
+cd front
+npm install
+```
+
+2. 개발 서버 실행:
+```bash
+npm run dev
+```
+
+3. 프로덕션 빌드:
+```bash
+npm run build
+```
+
+### 환경 변수 설정
+```bash
+# .env 파일
+VITE_API_BASE_URL=http://localhost:8000  # 백엔드 API 주소
+```
+
+### 개발 가이드라인
+
+#### 컴포넌트 구조
+- `src/components/`: 재사용 가능한 UI 컴포넌트
+- `src/api/`: 백엔드 API 통신 로직
+- `src/types/`: TypeScript 타입 정의
+
+#### 스타일링
+- Tailwind CSS 클래스를 활용한 스타일링
+- 커스텀 스타일은 `index.css`에 정의
+- 반응형 디자인 지원
+
+#### API 통신
+```typescript
+// src/api/client.ts 예시
+import axios from 'axios';
+
+const apiClient = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+export default apiClient;
+```
+
+## Docker 실행 환경 업데이트
+
+프론트엔드가 추가됨에 따라 Docker Compose 설정이 다음과 같이 업데이트됩니다:
+
+```yaml
+version: '3.8'
+services:
+  backend:
+    build: 
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
+    volumes:
+      - ../youtube_manager.db:/app/youtube_manager.db
+
+  frontend:
+    build:
+      context: ../front
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+```
+
+### 프론트엔드 Dockerfile
+```dockerfile
+# front/Dockerfile
+FROM node:20-alpine as builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+RUN npm run build
+
+FROM nginx:alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+
 
 ## 데이터베이스 스키마
 

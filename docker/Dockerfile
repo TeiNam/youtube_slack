@@ -1,10 +1,17 @@
 # docker/Dockerfile
-FROM python:3.12.8-slim
+# 프론트엔드 빌드 스테이지
+FROM node:18-alpine AS frontend-build
+WORKDIR /app/front
+COPY front/package*.json ./
+RUN npm ci
+COPY front/ .
+RUN npm run build
 
-# 작업 디렉토리 설정
+# 백엔드 스테이지
+FROM python:3.12.8-slim
 WORKDIR /app
 
-# 시스템 패키지 업데이트 및 필요한 패키지 설치
+# 시스템 패키지 설치
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     gcc \
@@ -15,21 +22,27 @@ RUN apt-get update && \
 ENV TZ=Asia/Seoul
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-# requirements.txt 복사 및 패키지 설치
+# 백엔드 의존성 설치
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 애플리케이션 코드 복사
+# 정적 파일을 위한 디렉토리 생성
+RUN mkdir -p /app/static
+
+# 프론트엔드 빌드 결과물 복사
+COPY --from=frontend-build /app/front/dist /app/static
+
+# 백엔드 코드 복사
 COPY apis/ /app/apis/
 COPY utils/ /app/utils/
 COPY main.py .
 
-# SQLite 데이터베이스를 위한 볼륨 설정
+# SQLite DB를 위한 볼륨
 VOLUME ["/app/data"]
 
 # 환경 변수 설정
 ENV PYTHONPATH=/app
 ENV DB_PATH=/app/data/youtube_manager.db
 
-# 애플리케이션 실행
+# 서버 실행
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
