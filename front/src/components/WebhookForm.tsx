@@ -1,3 +1,4 @@
+// WebhookForm.tsx
 import React, { useState } from 'react';
 import { createWebhook } from '../api/client';
 import { AlertCircle } from 'lucide-react';
@@ -11,7 +12,8 @@ export default function WebhookForm({ onSuccess }: { onSuccess: () => void }) {
     setError('');
     setLoading(true);
 
-    const formData = new FormData(e.currentTarget);
+    const form = e.target as HTMLFormElement;
+    const formData = new FormData(form);
     try {
       await createWebhook({
         workspace_name: formData.get('workspace_name') as string,
@@ -19,7 +21,7 @@ export default function WebhookForm({ onSuccess }: { onSuccess: () => void }) {
         url: formData.get('url') as string,
       });
       onSuccess();
-      e.currentTarget.reset();
+      form.reset();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create webhook');
     } finally {

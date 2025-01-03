@@ -2,6 +2,8 @@
 import time
 import logging
 import asyncio
+from dotenv import load_dotenv
+import os
 
 from datetime import timedelta
 from fastapi import FastAPI
@@ -132,12 +134,19 @@ async def lifespan(app: FastAPI):
 
 
 # FastAPI 애플리케이션 생성
+# .env 파일 로드
+load_dotenv()
+
+# 환경 변수에서 API 호스트와 포트 가져오기
+API_HOST = os.getenv('VITE_API_HOST', 'http://localhost')
+API_PORT = os.getenv('VITE_API_PORT', '8000')
+
 app = FastAPI(lifespan=lifespan)
 
 # CORS 미들웨어 추가
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Vite 개발 서버 주소
+    allow_origins=[f"{API_HOST}:{API_PORT}"],  # 환경 변수에서 가져온 주소 사용
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

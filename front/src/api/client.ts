@@ -1,7 +1,9 @@
 // api/client.ts
 import type { Webhook, Channel, SystemStatus } from '../types/api';
 
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+const API_HOST = import.meta.env.VITE_API_HOST || 'http://localhost';
+const API_PORT = import.meta.env.VITE_API_PORT || '8000';
+const API_BASE_URL = `${API_HOST}:${API_PORT}/api/v1`;
 
 // 공통 fetch 함수
 async function fetchAPI<T>(url: string, options: RequestInit = {}): Promise<T> {

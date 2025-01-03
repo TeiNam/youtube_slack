@@ -1,15 +1,33 @@
 services:
-  youtube-slack:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    container_name: youtube-slack
-    volumes:
-      - ./data:/app/data
-    ports:
-      - "8000:8000"
-    environment:
-      - TZ=Asia/Seoul
-      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
-      - CHECK_INTERVAL=1800
-    restart: unless-stopped
+ backend:
+   platform: linux/amd64
+   build:
+     context: ..
+     dockerfile: docker/Dockerfile.backend
+   container_name: youtube-slack-backend
+   volumes:
+     - ./data:/app/data
+   ports:
+     - "8000:8000"
+   environment:
+     - TZ=Asia/Seoul
+     - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
+     - CHECK_INTERVAL=10800
+   restart: always
+
+ frontend:
+   platform: linux/amd64
+   build:
+     context: ..
+     dockerfile: docker/Dockerfile.frontend
+   container_name: youtube-slack-frontend
+   ports:
+     - "5173:5173"
+   volumes:
+     - ../front:/app
+     - /app/node_modules
+   environment:
+     - VITE_API_URL=http://192.168.55.115:8000
+   depends_on:
+     - backend
+   restart: always

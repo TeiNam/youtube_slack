@@ -1,3 +1,4 @@
+// ChannelForm.tsx
 import React, { useState } from 'react';
 import { createChannel } from '../api/client';
 import { AlertCircle } from 'lucide-react';
@@ -17,14 +18,15 @@ export default function ChannelForm({ webhooks, onSuccess }: Props) {
     setError('');
     setLoading(true);
 
-    const formData = new FormData(e.currentTarget);
+    const form = e.target as HTMLFormElement;
+    const formData = new FormData(form);
     try {
       await createChannel({
         webhook_id: Number(formData.get('webhook_id')),
         yt_handling_id: formData.get('yt_handling_id') as string,
       });
       onSuccess();
-      e.currentTarget.reset();
+      form.reset();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create channel');
     } finally {
