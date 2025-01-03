@@ -5,6 +5,7 @@ import asyncio
 
 from datetime import timedelta
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from apis.routers import api_router
 from utils.config import Config
@@ -132,8 +133,21 @@ async def lifespan(app: FastAPI):
 
 # FastAPI 애플리케이션 생성
 app = FastAPI(lifespan=lifespan)
+
+# CORS 미들웨어 추가
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # Vite 개발 서버 주소
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(api_router, prefix="/api/v1")
 
+@app.get("/")
+async def root():
+    return {"status": "running"}
 
 # 서비스 상태 확인 엔드포인트
 @app.get("/status")
